@@ -19,9 +19,18 @@
         .main-container { display: flex; flex: 1; overflow: hidden; }
 
         /* Khu vực bên trái: Đoạn văn */
-        .left-pane { flex: 1; background: #fff; padding: 20px; overflow-y: auto; border-right: 2px solid #ddd; }
-        .passage-box { background: #fdfdfd; border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 5px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05); }
-        .passage-type { font-weight: bold; color: #0056b3; margin-bottom: 15px; font-size: 1.1rem; text-transform: uppercase; border-bottom: 2px solid #0056b3; display: inline-block; padding-bottom: 5px;}
+        .left-pane { flex: 1; background: #fff; padding: 20px; overflow-y: auto; border-right: 2px solid #ddd; position: relative; }
+        
+        /* --- THÊM MỚI: CSS CHO THANH CÔNG CỤ ZOOM --- */
+        .zoom-controls { position: sticky; top: -20px; background: rgba(255, 255, 255, 0.95); padding: 10px 0; display: flex; justify-content: flex-end; gap: 8px; z-index: 5; border-bottom: 1px solid #eee; margin-bottom: 15px; }
+        .zoom-btn { padding: 4px 12px; font-size: 1rem; font-weight: bold; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; color: #333; transition: 0.2s; }
+        .zoom-btn:hover { background: #e9ecef; border-color: #adb5bd; }
+        /* --------------------------------------------- */
+
+        /* Bọc bài đọc để zoom mượt hơn */
+        #passage-pane { transition: font-size 0.2s ease-in-out; }
+        .passage-box { background: #fdfdfd; border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 5px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05); line-height: 1.6; }
+        .passage-type { font-weight: bold; color: #0056b3; margin-bottom: 15px; font-size: 1.1em; text-transform: uppercase; border-bottom: 2px solid #0056b3; display: inline-block; padding-bottom: 5px;}
         
         /* Khu vực bên phải: Câu hỏi */
         .right-pane { flex: 1; padding: 20px; overflow-y: auto; background: #fafafa; }
@@ -78,7 +87,14 @@
     </header>
 
     <div class="main-container">
-        <div class="left-pane" id="passage-pane"></div>
+        <div class="left-pane">
+            <div class="zoom-controls">
+                <span style="font-size: 0.9rem; color: #666; margin-right: auto; line-height: 28px; font-weight: bold;">Cỡ chữ bài đọc:</span>
+                <button class="zoom-btn" onclick="changeZoom(0.1)" title="Phóng to">A+</button>
+                <button class="zoom-btn" onclick="changeZoom(-0.1)" title="Thu nhỏ">A-</button>
+            </div>
+            <div id="passage-pane"></div>
+        </div>
 
         <div class="right-pane" id="question-pane"></div>
     </div>
@@ -101,6 +117,9 @@
         let currentPassageIndex = 0; 
         let userAnswers = {}; 
         let isSubmitted = false;
+        
+        // --- THÊM MỚI: Biến quản lý mức độ Zoom ---
+        let currentZoomLevel = 1; // 1 tương đương 1rem (mặc định)
 
         // 2. Hàm khởi tạo chạy đầu tiên
         function initApp() {
@@ -109,7 +128,7 @@
                 return;
             }
 
-            // Đã BỎ .sort(() => Math.random() - 0.5) ở dòng dưới đây
+            // Đã BỎ .sort(() => Math.random() - 0.5) để giữ nguyên thứ tự gốc
             let shuffledPassages = [...rawExamData];
             
             let globalQuestionId = 1;
@@ -124,6 +143,19 @@
             renderLayout();
         }
 
+        // --- THÊM MỚI: Hàm xử lý thu phóng bài đọc ---
+        function changeZoom(step) {
+            currentZoomLevel += step;
+            
+            // Giới hạn thu phóng: nhỏ nhất là 0.8, lớn nhất là 2.0 để không vỡ giao diện
+            if (currentZoomLevel < 0.8) currentZoomLevel = 0.8;
+            if (currentZoomLevel > 2.0) currentZoomLevel = 2.0;
+            
+            // Cập nhật cỡ chữ cho thẻ chứa bài đọc
+            document.getElementById('passage-pane').style.fontSize = currentZoomLevel + 'rem';
+        }
+        // ----------------------------------------------
+
         // 3. Hàm vẽ giao diện bài đọc và câu hỏi
         function renderLayout() {
             const passagePane = document.getElementById('passage-pane');
@@ -135,6 +167,9 @@
                 <div class="passage-type">${currentData.type} (Questions ${currentData.questions[0].globalId} - ${currentData.questions[currentData.questions.length-1].globalId})</div>
                 ${textsHtml}
             `;
+
+            // Giữ nguyên mức Zoom hiện tại khi chuyển bài
+            passagePane.style.fontSize = currentZoomLevel + 'rem';
 
             let questionsHtml = currentData.questions.map(q => {
                 let optionsHtml = ['A', 'B', 'C', 'D'].map(opt => {
@@ -224,7 +259,9 @@
         function changePassage(step) {
             currentPassageIndex += step;
             renderLayout();
-            document.getElementById('passage-pane').scrollTop = 0;
+            
+            // Cuộn lên đầu bài đọc và câu hỏi khi chuyển bài
+            document.querySelector('.left-pane').scrollTop = 0;
             document.getElementById('question-pane').scrollTop = 0;
         }
 
@@ -247,7 +284,6 @@
         function submitExam() {
             if (isSubmitted) return;
             
-            // Luôn hỏi xác nhận trước khi nộp vì không còn tự động nộp khi hết giờ nữa
             let confirmSubmit = confirm("Bạn có chắc chắn muốn nộp bài không?");
             if (!confirmSubmit) return;
 
